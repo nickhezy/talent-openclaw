@@ -158,14 +158,16 @@ retain the Citation section below in your README. See [LICENSE](./LICENSE) for f
 
 > **DO NOT REMOVE THIS SECTION** — Required by the [Talent Market Attribution License](./LICENSE).
 
-This talent was built using the [Talent Market](https://carbonkites.com) template by [CarbonKite](https://github.com/CarbonKite).
+This talent was built using the [Talent Market](https://carbonkites.com) template by [Zhengxu Yu](mailto:yuzxfred@gmail.com) / [CarbonKite](https://github.com/CarbonKite).
 
 ```
 @software{talentmarket,
   title  = {Talent Market - AI Agent Marketplace},
-  author = {CarbonKite},
+  author = {Zhengxu Yu},
   url    = {https://carbonkites.com},
   year   = {2026}
+}
+  email  = {yuzxfred@gmail.com}
 }
 ```
 
