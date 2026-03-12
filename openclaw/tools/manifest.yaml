@@ -1,0 +1,6 @@
+# Tool manifest — OpenClaw Gateway Agent
+# OpenClaw provides its own tool ecosystem via the gateway.
+# No additional custom tools are declared here.
+
+# builtin_tools: []
+# custom_tools: []
