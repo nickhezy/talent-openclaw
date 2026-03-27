@@ -5,12 +5,12 @@
 #   bash launch.sh <employee_dir>
 #
 # Environment variables (injected by platform):
-#   OMC_EMPLOYEE_ID      — Employee ID
-#   OMC_TASK_ID          — Task ID
-#   OMC_PROJECT_ID       — Project ID
-#   OMC_PROJECT_DIR      — Project workspace (cwd)
-#   OMC_TASK_DESCRIPTION — Full task description
-#   OMC_SERVER_URL       — Backend URL
+#   OMC_EMPLOYEE_ID           — Employee ID
+#   OMC_TASK_ID               — Task ID
+#   OMC_PROJECT_ID            — Project ID
+#   OMC_PROJECT_DIR           — Project workspace (cwd)
+#   OMC_TASK_DESCRIPTION_FILE — Path to file containing task/prompt text
+#   OMC_SERVER_URL            — Backend URL
 #
 # Output: single JSON line to stdout, logs to stderr.
 
@@ -86,22 +86,49 @@ if [ "$GATEWAY_RUNNING" = false ]; then
     done
 fi
 
-# ── Run task via openclaw agent ───────────────────────────────────────────────
->&2 echo "[launch.sh] Employee=${OMC_EMPLOYEE_ID} Task=${OMC_TASK_ID}"
-
-OUTPUT=$("$OPENCLAW_BIN" agent -m "$OMC_TASK_DESCRIPTION" 2>/dev/null || echo "")
-
-if [ -z "$OUTPUT" ]; then
-    OUTPUT="[openclaw] No output returned"
+# ── Read task description from file ──────────────────────────────────────────
+TASK_DESC_FILE="${OMC_TASK_DESCRIPTION_FILE:-}"
+if [ -z "$TASK_DESC_FILE" ] || [ ! -f "$TASK_DESC_FILE" ]; then
+    >&2 echo "ERROR: OMC_TASK_DESCRIPTION_FILE not set or file not found"
+    exit 1
 fi
+OMC_TASK_DESCRIPTION="$(cat "$TASK_DESC_FILE")"
 
-# ── Emit result JSON to stdout ────────────────────────────────────────────────
+# ── Run task via openclaw agent ───────────────────────────────────────────────
+SESSION_ID="omc-${OMC_EMPLOYEE_ID}-${OMC_TASK_ID:-conv}"
+>&2 echo "[launch.sh] Employee=${OMC_EMPLOYEE_ID} Task=${OMC_TASK_ID} Session=${SESSION_ID}"
+
+RAW=$("$OPENCLAW_BIN" agent --local -m "$OMC_TASK_DESCRIPTION" --session-id "$SESSION_ID" --json 2>/dev/null || echo "")
+
+# ── Parse openclaw JSON response ────────────────────────────────────────────
 python3 -c "
 import json, sys
+
+raw = sys.argv[1] if len(sys.argv) > 1 else ''
+output = '[openclaw] No output returned'
+model = 'openclaw/openrouter'
+in_tok = 0
+out_tok = 0
+
+if raw:
+    try:
+        data = json.loads(raw)
+        payloads = data.get('payloads', [])
+        if payloads:
+            output = payloads[0].get('text', output)
+        meta = data.get('meta', {}).get('agentMeta', {})
+        model = f\"openclaw/{meta.get('model', 'unknown')}\"
+        usage = meta.get('usage', {})
+        in_tok = usage.get('input', 0)
+        out_tok = usage.get('output', 0)
+    except (json.JSONDecodeError, KeyError, IndexError):
+        if raw.strip():
+            output = raw
+
 print(json.dumps({
-    'output': sys.argv[1],
-    'model': 'openclaw/openrouter',
-    'input_tokens': 0,
-    'output_tokens': 0,
+    'output': output,
+    'model': model,
+    'input_tokens': in_tok,
+    'output_tokens': out_tok,
 }))
-" "$OUTPUT"
+" "$RAW"
